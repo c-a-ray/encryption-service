@@ -12,7 +12,8 @@
 
 To encrypt a username/password pair, use the `-e` or `--encrypt` flag
 
-Example usage:
+##### Example usage:
+
 `python3 -m crypto-service --encrypt --username 'username' --password 'password' --output './output/'`
 
 or
@@ -25,7 +26,8 @@ When encrypting, a new key file is generated in the specified output directory w
 
 To decrypt an encrypted username/password pair, use the `-d` or `--decrypt` flag
 
-Example usage:
+##### Example usage:
+
 `python3 -m crypto-service --decrypt --username '{encrypted-username}' --password '{encrypted-password}' --output './output/' --keypath './output/.key{uniqueID}'`
 
 or
@@ -33,7 +35,7 @@ or
 `python3 -m crypto-service -d -u '{encrypted-username}' -p '{encrypted-password}' -o './output/' -k './output/.key{uniqueID}'`
 
 When decrypting, the key file originally used to encrypt the text must be specified. You can determine which key file
-this is by matching the uniqueID from the output JSON file with the uniqueID appended to the key file's name.
+this is by matching the `uniqueID` from the output JSON file with the `uniqueID` appended to the key file's name.
 
 #### Example of encrypting and decrypting a username/password pair:
 
@@ -43,3 +45,4 @@ this is by matching the uniqueID from the output JSON file with the uniqueID app
 3. The encrypted username/password pair are written to `output/encrypted-12345.json`
 4. To decrypt, user runs:
    `python3 -m crypto-service -d -u '{encrypted username from encrypted-12345.json}' -p '{encrypted password from encrypted-12345.json}' -o './output/' -k './output/.key12345'`
+5. The plaintext username/password pair is written to `output/decrypted-12345.json`
