@@ -1,12 +1,25 @@
 ### General Usage:
 
-`python3 -m crypto-service [-h] [-e | -d] -u USERNAME -p PASSWORD [-k KEYPATH] -o OUTPUT`
+`crypto-service.py [-h] [-e | -d | -c] [-u USERNAME] [-p PASSWORD] [-uid UNIQUEID] [-o OUTPUT]`
 
-    - Either '-e' (or '--encrypt') or '-d' (or '--decrypt') must be specified
-    - A username must be specified after the '-u' (or '--username' flag)
-    - A password must be specified after the '-p' (or '--password' flag)
-    - For decryption, the path to the key file used to encrypt must be specified after a '-k' or '--keypath' flag
-    - For both encryption and decryption, the path to the desired output directory must be specified after a '-o' or '--output' flag
+- One of the following three flags must be specified:
+  - Encrypt credentials with '-e' or '--encrypt'
+  - Decrypt credentials with '-d' or '--decrypt'
+  - Delete key files directory with '-c' or '--cleanup'
+- A username must be specified after the '-u' (or '--username' flag)
+- A password must be specified after the '-p' (or '--password' flag)
+- An output directory (where the results will be written) can be specified after '-o' or '--output'
+  - If no output directory is specified, the the the output file is written to the current working directory
+- For both encryption and decryption, results are written to a file named 'crypto-service-results.json'
+  - This file will have four fields:
+    - 'uid': a unique identifier
+    - 'username': the encrypted or decrypted username
+    - 'password': the encrypted or decrypted password
+    - 'text_state': if the username/password in the results are encrypted, this will be 'encrypted. If they are decrypted, it will be 'decrypted'
+- Every time a set of credentials are encrypted, a hidden key file is generated and stored in a hidden directory called '.crypto-service-keys' in the user's home directory
+  - Using the clean-up flag will delete this directory and all of the keys in it. Credentials encrypted with these keys will no longer be decryptable
+- When encrypting, a new 32-digit hexadecimal 'uid' (unique identifier) is generated and included in the JSON output
+- When decrypting, the 'uid' returned from encryption must be passed to crypto-service after a '-uid' or '--uniqueid' flag
 
 ### Encryption:
 
@@ -14,13 +27,11 @@ To encrypt a username/password pair, use the `-e` or `--encrypt` flag
 
 ##### Example usage:
 
-`python3 -m crypto-service --encrypt --username 'username' --password 'password' --output './output/'`
+`python3 -m crypto-service --encrypt --username '{username}' --password '{password}'`
 
 or
 
-`python3 -m crypto-service -e -u 'username' -p 'password' -o './output/'`
-
-When encrypting, a new key file is generated in the specified output directory with the form `.key{uniqueID}` where `{uniqueID}` is a unique pseudo-random integer between 1 and 99999 (e.g. `output/.key12345`). An output JSON file with the encrypted credentials is also stored in the output directory with the form `encrypted-{uniqueID}.json`where`{uniqueID}` is the same integer as the generated key file. This allows the user to match the encrypted credentials to the appropriate key file, which will be needed to decrypt the ciphertext.
+`python3 -m crypto-service -e -u '{username}' -p '{password}'`
 
 ### Decryption:
 
@@ -28,21 +39,39 @@ To decrypt an encrypted username/password pair, use the `-d` or `--decrypt` flag
 
 ##### Example usage:
 
-`python3 -m crypto-service --decrypt --username '{encrypted-username}' --password '{encrypted-password}' --output './output/' --keypath './output/.key{uniqueID}'`
+`python3 -m crypto-service --decrypt --uniqueid '{uid}' --username '{encrypted-username}' --password '{encrypted-password}'`
 
 or
 
-`python3 -m crypto-service -d -u '{encrypted-username}' -p '{encrypted-password}' -o './output/' -k './output/.key{uniqueID}'`
+`python3 -m crypto-service -d -uid '{uid}' -u '{encrypted-username}' -p '{encrypted-password}'`
 
-When decrypting, the key file originally used to encrypt the text must be specified. You can determine which key file
-this is by matching the `uniqueID` from the output JSON file with the `uniqueID` appended to the key file's name.
+When decrypting, the unique ID returned with the encrypted credentials must also be provided.
+
+### Clean-up
+
+Because encryption keys are stored locally on whichever machine is running the program, a clean-up option has been included to delete the directory containing all of the key files.
+
+##### Example usage:
+
+`python3 -m crypto-service --cleanup`
+
+or
+
+`python3 -m crypto-service -c`
 
 #### Example of encrypting and decrypting a username/password pair:
 
 1. To encrypt, user runs:
-   `python3 -m crypto-service -e -u 'username' -p 'password' -o './output/'`
-2. A new key is generated and stored in `output/.key12345`
-3. The encrypted username/password pair are written to `output/encrypted-12345.json`
-4. To decrypt, user runs:
-   `python3 -m crypto-service -d -u '{encrypted username from encrypted-12345.json}' -p '{encrypted password from encrypted-12345.json}' -o './output/' -k './output/.key12345'`
-5. The plaintext username/password pair is written to `output/decrypted-12345.json`
+   `python3 -m crypto-service -e -u 'myFakeUsername' -p 'myFakePa$$word'`
+2. Since no output directory was specified, results are written to the current working directory, in a file called `crypto-service-results.json`
+   - This file will contain the encrypted username, password, and a UID. All three of these must be stored.
+3. To decrypt, user runs:
+   `python3 -m crypto-service -d -uid '{uid}' -u '{encrypted username}' -p '{encrypted password}'`
+4. The decrypted username/password pair is written to `crypto-service-results.json`
+
+#### Additional notes
+
+- The calling program will need to wait after calling crypto-service before opening the output file
+  - Benchmark tests indicate that this program consistently completes in far less than .01 seconds
+  - A 0.5 second sleep may be prudent. A test showed that the program successfully ran 1,000 times in less than 0.5 seconds.
+- A testing script `test.py` is included in the repo. This script acts as a proof-of-concept for how a program would interact with crypto-service programmatically
