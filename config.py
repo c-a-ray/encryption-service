@@ -70,8 +70,6 @@ class Config:
                 output_file.write(dumps(output_data))
             except Exception as e:
                 print(f'Failed to create output file: {e}')
-            else:
-                print(f'Successfully created output file')
 
     def run_cleanup(self):
         action_verified = input(f"""
