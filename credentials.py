@@ -1,71 +1,94 @@
 from os.path import exists, join
+from os import getcwd, path, urandom
 from cryptography.fernet import Fernet
 from json import dumps
-import random
+from secrets import token_hex
 
-ENCRYPTED = 'encrypted'
-DECRYPTED = 'decrypted'
-UNKOWN = 'unknown'
+ENCRYPT = 'encrypt'
+DECRYPT = 'decrypt'
 
 
 class Credentials:
-    def __init__(self, args):
-        self.username = args.username
-        self.password = args.password
-        self.text_state = self.get_text_state(args)
+    def __init__(self, args, path_to_keys):
+        self.path_to_keys = path_to_keys
+        self.action = self.determine_action(args)
+
+        self.errors = list()
+
+        if self.action == None:
+            self.errors.append(
+                'Missing argument: please specify an action (encrypt, decrypt, or clean-up)')
+
+        if args.username:
+            self.username = args.username
+        else:
+            self.errors.append(
+                f'Missing argument: expected a username to {self.action}')
+
+        if args.password:
+            self.password = args.password
+        else:
+            self.errors.append(
+                f'Missing argument: expected a password to {self.action}')
 
         self.set_and_validate_output_dir(args)
 
         if not self.has_error():
             self.get_or_create_key(args)
 
-    def get_text_state(self, args):
+    def determine_action(self, args):
         if args.encrypt:
-            return DECRYPTED
+            return ENCRYPT
         elif args.decrypt:
-            return ENCRYPTED
+            return DECRYPT
         else:
-            return UNKOWN
+            return None
 
     def set_and_validate_output_dir(self, args):
-        self.outputdir = args.output
-        if not exists(self.outputdir):
-            self.error = f'Invalid argument: output directory {self.outputdir} does not exist'
+        if args.output:
+            self.outputdir = args.output
+            if not exists(self.outputdir):
+                self.errors.append(
+                    f'Invalid argument: output directory {self.outputdir} does not exist')
+        else:
+            self.outputdir = getcwd()
+            print(
+                f'No output directory specified. Writing output to CWD ({self.outputdir})')
 
     def get_or_create_key(self, args):
-        if self.text_state == ENCRYPTED:
-            if args.keypath:
-                if exists(args.keypath):
-                    self.keypath = args.keypath
-                    self.unique_identifier = self.keypath.split('.key')[-1]
-                else:
-                    self.error = f'Invalid argument: key file {args.keypath} does not exist'
-            else:
-                self.error = 'Missing argument: for decryption, please specify path to key file with "-k" or "--keypath"'
-        elif self.text_state == DECRYPTED:
+        if self.action == ENCRYPT:
             self.create_new_key_file()
-        else:
-            self.error = 'Missing argument: please specify encryption (with "-e" or "--encrypt") or decryption (with "-d" or "--decrypt")'
+        elif self.action == DECRYPT:
+            if args.uniqueid:
+                self.uniqueid = args.uniqueid
+                self.key_path = join(
+                    self.path_to_keys, f'.{self.uniqueid}')
+                if not exists(self.key_path):
+                    self.errors.append(
+                        f'Invalid argument:{self.uniqueid} is not valid unique ID')
+            else:
+                self.errors.append(
+                    f'Missing argument: to decrypt, provide the unique ID that was provided after encryption')
 
     def has_error(self) -> bool:
-        return hasattr(self, 'error')
+        return len(self.errors) > 0
+
+    def print_errors(self):
+        for err in self.errors:
+            print(err)
 
     def create_new_key_file(self):
-        # Create a filename that doesn't already exist in the output dir
-        unique_identifier = random.randint(1, 99999)
-        while (exists(join(self.outputdir, f'.key{unique_identifier}'))):
-            unique_identifier = random.randint(1, 99999)
+        self.uniqueid = token_hex(16)
+        self.key_path = join(self.path_to_keys, f'.{self.uniqueid}')
+        while (exists(self.key_path)):
+            self.uniqueid = token_hex(16)
+            self.key_path = join(self.path_to_keys, f'.{self.uniqueid}')
 
-        # Store unique ID so we know which output goes with which key
-        self.unique_identifier = unique_identifier
-        self.keypath = join(self.outputdir, f'.key{unique_identifier}')
-
-        # Generate and write new key to new key file in output dir
-        with open(self.keypath, 'w') as key_file:
+        with open(self.key_path, 'w') as key_file:
             key_file.write(Fernet.generate_key().decode())
 
     def load_key(self) -> str:
-        with open(self.keypath, 'r') as key_file:
+        with open(self.key_path, 'r') as key_file:
             return key_file.read()
 
     def encrypt(self):
@@ -79,12 +102,14 @@ class Credentials:
         self.password = f.decrypt(self.password.encode()).decode()
 
     def write_to_file(self):
-        output_filename = f'decrypted-{self.unique_identifier}.json' \
-            if self.text_state == ENCRYPTED \
-            else f'encrypted-{self.unique_identifier}.json'
+        text_state = 'encrypted' if self.action == ENCRYPT else 'decrypted'
+        output_filename = 'crypto-service-results.json'
+        output_data = {
+            'uid': self.uniqueid,
+            'text_state': text_state,
+            'username': self.username,
+            'password': self.password,
+        }
 
         with open(join(self.outputdir, output_filename), 'w') as output_file:
-            output_file.write(dumps({
-                'username': self.username,
-                'password': self.password
-            }))
+            output_file.write(dumps(output_data))
