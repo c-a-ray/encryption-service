@@ -4,7 +4,6 @@ import os
 import json
 
 RESULTS_FILENAME = 'crypto-service-results.json'
-KEYS_DIRECTORY = '.crypto-service-keys'
 USERNAME = "fakeUsername"
 PASSWORD = "fakePa$$word123"
 OUTPUT_DIR_PATH = os.path.join(os.getcwd(), 'output')
@@ -14,7 +13,7 @@ SLEEP_LENGTH = .05
 def run_encryption_test():
     # Send the credentials to crypto-service and wait for it to finish
     print(
-        f"Sending request to encrypt username {USERNAME} and password {PASSWORD}\n")
+        f"Sending request to encrypt username '{USERNAME}' and password '{PASSWORD}'\n")
     subprocess.run(["python3", "-m", "crypto-service", "-e", "-u",
                    f"{USERNAME}", "-p", f"{PASSWORD}", "-o", f"{OUTPUT_DIR_PATH}"])
     sleep(SLEEP_LENGTH)
@@ -30,8 +29,8 @@ def run_encryption_test():
     encrypted_username = results["username"]
     encrypted_password = results["password"]
 
+    # Verify that the text_state is 'encrypted'
     success = False
-
     if text_state == "encrypted":
         success = True
         print("Successfully encrypted username and password")
@@ -42,6 +41,7 @@ def run_encryption_test():
     # Delete results file
     os.remove(path_to_results)
 
+    # Return encrypted results so we can decrypt them
     return {
         'success': success,
         'uid': uid,
@@ -66,6 +66,7 @@ def run_decryption_test(encrypted_username, encrypted_password, uid):
     result_username = results["username"]
     result_password = results["password"]
 
+    # Verify that the text_state is 'decrypted'
     success = False
     if text_state == "decrypted":
         success = True
