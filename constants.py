@@ -1,0 +1,2 @@
+ENCRYPT = 'encrypt'
+DECRYPT = 'decrypt'

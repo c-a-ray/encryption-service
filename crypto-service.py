@@ -1,6 +1,7 @@
 from os.path import join, expanduser
-from credentials import DECRYPT, ENCRYPT, Credentials
+from credentials import Credentials
 from config import Config
+from constants import DECRYPT, ENCRYPT
 from args import get_args
 
 KEYS_DIRECTORY = '.crypto-service-keys'
@@ -22,17 +23,16 @@ def run_crypto_service():
         cfg.print_errors()
         return
 
-    credentials = Credentials(args)
+    credentials = Credentials(args, cfg)
     if credentials.has_error():
         credentials.print_errors()
         return
-
     if credentials.action == ENCRYPT:
         cfg.create_new_uid()
         cfg.create_new_key_file(credentials)
         credentials.encrypt(cfg)
     elif credentials.action == DECRYPT:
-        cfg.find_key(args)
+        cfg.find_keys()
         if cfg.has_error():
             cfg.print_errors()
             return

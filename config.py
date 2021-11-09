@@ -3,7 +3,7 @@ from os import getcwd, mkdir
 from json import dumps
 from secrets import token_hex
 from shutil import rmtree
-from credentials import ENCRYPT
+from constants import DECRYPT, ENCRYPT
 
 
 class Config:
@@ -30,46 +30,77 @@ class Config:
                 f'No output directory specified. Writing output to {self.outputdir}')
 
     def create_new_uid(self):
-        self.uniqueid = token_hex(16)
-        self.key_path = join(self.path_to_keys, f'.{self.uniqueid}')
-        while (exists(self.key_path)):
-            self.uniqueid = token_hex(16)
-            self.key_path = join(self.path_to_keys, f'.{self.uniqueid}')
+        self.new_uid = token_hex(16)
+        self.new_key_path = join(self.path_to_keys, f'.{self.new_uid}')
+        while (exists(self.new_key_path)):
+            self.new_uid = token_hex(16)
+            self.new_key_path = join(self.path_to_keys, f'.{self.new_uid}')
 
     def create_new_key_file(self, credentials):
-        with open(self.key_path, 'w') as key_file:
+        with open(self.new_key_path, 'w') as key_file:
             key_file.write(credentials.get_new_key())
 
-    def find_key(self, args):
-        if args.uniqueid:
-            self.uniqueid = args.uniqueid
-            self.key_path = join(
-                self.path_to_keys, f'.{self.uniqueid}')
-            if not exists(self.key_path):
-                self.errors.append(
-                    f'Invalid argument:{self.uniqueid} is not valid unique ID')
-        else:
-            self.errors.append(
-                f'Missing argument: to decrypt, provide the unique ID that was provided after encryption')
+    def set_username_uid(self, username_uid):
+        self.username_uid = username_uid
 
-    def load_key(self):
-        with open(self.key_path, 'r') as key_file:
+    def set_password_uid(self, password_uid):
+        self.password_uid = password_uid
+
+    def find_keys(self):
+        if hasattr(self, 'username_uid'):
+            self.username_key_path = join(
+                self.path_to_keys, f'.{self.username_uid}')
+            if not exists(self.username_key_path):
+                self.errors.append(
+                    f'Invalid argument: provided username UID {self.username_uid} is not a valid unique ID')
+
+        if hasattr(self, 'password_uid'):
+            self.password_key_path = join(
+                self.path_to_keys, f'.{self.password_uid}')
+            if not exists(self.password_key_path):
+                self.errors.append(
+                    f'Invalid argument: provided password UID {self.password_uid} is not a valid unique ID')
+
+    def load_new_key(self) -> str:
+        return self.load_key(self.new_key_path)
+
+    def load_username_key(self) -> str:
+        return self.load_key(self.username_key_path)
+
+    def load_password_key(self) -> str:
+        return self.load_key(self.password_key_path)
+
+    def load_key(self, key_path: str) -> str:
+        with open(key_path, 'r', encoding='utf-8') as key_file:
             return key_file.read()
 
-    def write_output(self, credentials, output_filename):
-        text_state = 'encrypted' if credentials.action == ENCRYPT else 'decrypted'
-        output_data = {
-            'uid': self.uniqueid,
-            'text_state': text_state,
-            'username': credentials.username,
-            'password': credentials.password,
-        }
-
+    def write_output(self, credentials, output_filename: str):
+        output_data: dict = self.create_output_data(credentials)
         with open(join(self.outputdir, output_filename), 'w') as output_file:
             try:
                 output_file.write(dumps(output_data))
             except Exception as e:
                 print(f'Failed to create output file: {e}')
+
+    def create_output_data(self, credentials) -> dict:
+        output_data: dict = {}
+        if credentials.action == ENCRYPT:
+            output_data = {'text_state': 'encrypted'}
+            if hasattr(credentials, 'username'):
+                output_data['username'] = credentials.username
+                output_data['uuid'] = self.new_uid
+            if hasattr(credentials, 'password'):
+                output_data['password'] = credentials.password
+                output_data['puid'] = self.new_uid
+        elif credentials.action == DECRYPT:
+            output_data = {'text_state': 'decrypted'}
+            if hasattr(credentials, 'username'):
+                output_data['username'] = credentials.username
+                output_data['uuid'] = self.username_uid
+            if hasattr(credentials, 'password'):
+                output_data['password'] = credentials.password
+                output_data['puid'] = self.password_uid
+        return output_data
 
     def run_cleanup(self):
         action_verified = input(f"""

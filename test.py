@@ -1,101 +1,221 @@
-import subprocess
+"""
+test.py:
+    Testing script for crypto-service.
+    Runs three tests:
+        - Encrypt and then decrypt a single username
+        - Encrypt and then decrypt a single password
+        - Encrypt and then decrypt a username/password pair
+"""
+
+from subprocess import run
 from time import sleep
-import os
-import json
+from os.path import join
+from os import remove, getcwd
+from json import load
 
-RESULTS_FILENAME = 'crypto-service-results.json'
-USERNAME = "fakeUsername"
-PASSWORD = "fakePa$$word123"
-OUTPUT_DIR_PATH = os.path.join(os.getcwd(), 'output')
-SLEEP_LENGTH = .05
+RESULTS_FILENAME: str = 'crypto-service-results.json'
+USERNAME: str = "fakeUsername"
+PASSWORD: str = "fakePa$$word123"
+OUTPUT_DIR_PATH: str = join(getcwd(), 'output')
+SLEEP_LENGTH: float = 0.05
 
 
-def run_encryption_test():
-    # Send the credentials to crypto-service and wait for it to finish
-    print(
-        f"Sending request to encrypt username '{USERNAME}' and password '{PASSWORD}'\n")
-    subprocess.run(["python3", "-m", "crypto-service", "-e", "-u",
-                   f"{USERNAME}", "-p", f"{PASSWORD}", "-o", f"{OUTPUT_DIR_PATH}"])
+def encrypt_username() -> dict:
+    print('Encrypting username')
+
+    run(['python3', '-m', 'crypto-service',
+        '-e', '-u', f'{USERNAME}', '-o', f'{OUTPUT_DIR_PATH}'], check=True)
     sleep(SLEEP_LENGTH)
 
-    # Read the results from the output file
-    path_to_results = os.path.join(OUTPUT_DIR_PATH, RESULTS_FILENAME)
-    with open(path_to_results) as results_file:
-        results = json.load(results_file)
+    path_to_results: str = join(OUTPUT_DIR_PATH, RESULTS_FILENAME)
+    with open(path_to_results, encoding='utf-8') as results_file:
+        results = load(results_file)
 
-    # Store the encrypted username and password
-    text_state = results["text_state"]
-    uid = results["uid"]
-    encrypted_username = results["username"]
-    encrypted_password = results["password"]
+    success: bool = True
+    if results['text_state'] != 'encrypted' or results['username'] == USERNAME:
+        print('Error: Text is not encrypted')
+        success = False
 
-    # Verify that the text_state is 'encrypted'
-    success = False
-    if text_state == "encrypted":
-        success = True
-        print("Successfully encrypted username and password")
-        print(f"UID: {uid}")
-        print(f"Encrypted username: {encrypted_username}")
-        print(f"Encrypted password: {encrypted_password}\n")
-
-    # Delete results file
-    os.remove(path_to_results)
-
-    # Return encrypted results so we can decrypt them
     return {
         'success': success,
-        'uid': uid,
-        'username': encrypted_username,
-        'password': encrypted_password
+        'username': results['username'],
+        'uuid': results['uuid']
     }
 
 
-def run_decryption_test(encrypted_username, encrypted_password, uid):
-    # Send encrypted credentials and path to key file to crypto-service and wait for it to finish
-    subprocess.run(["python3", "-m", "crypto-service", "-d", "-uid", f"{uid}",  "-u",
-                   f"{encrypted_username}", "-p", f"{encrypted_password}", "-o", f"{OUTPUT_DIR_PATH}"])
+def decrypt_username(encrypted_username: str, uuid: str) -> bool:
+    print('Decrypting username')
+
+    run(['python3', '-m', 'crypto-service', '-d', '-u',
+        f'{encrypted_username}', '-uuid', f'{uuid}', '-o', f'{OUTPUT_DIR_PATH}'], check=True)
     sleep(SLEEP_LENGTH)
 
-    # Read results file
-    path_to_results = os.path.join(OUTPUT_DIR_PATH, RESULTS_FILENAME)
-    with open(path_to_results) as results_file:
-        results = json.load(results_file)
+    path_to_results: str = join(OUTPUT_DIR_PATH, RESULTS_FILENAME)
+    with open(path_to_results, encoding='utf-8') as results_file:
+        results = load(results_file)
 
-    # Store decrypted username and password
-    text_state = results["text_state"]
-    result_username = results["username"]
-    result_password = results["password"]
+    success: bool = True
+    if results['text_state'] != 'decrypted':
+        success = False
+        print('Error: Text state is not decrypted')
+    if results['username'] != USERNAME:
+        success = False
+        print('Error: Decrypted username does not match original')
+    if results['uuid'] != uuid:
+        success = False
+        print('Error: Returned UUID does not match original')
 
-    # Verify that the text_state is 'decrypted'
-    success = False
-    if text_state == "decrypted":
-        success = True
-        print("Successfully decrypted username and password")
-        print(f"Decrypted username: {result_username}")
-        print(f"Decrypted password: {result_password}\n")
-
-    # Remove results file
-    os.remove(path_to_results)
-
-    # Just a check that the decrypted credentials match the original
-    if result_username == USERNAME:
-        print("Decrypted username matches original")
-    else:
-        print("Decrypted username does not match original")
-
-    if result_password == PASSWORD:
-        print("Decrypted password matches original")
-    else:
-        print("Decrypted password does not match original")
-
-    return {'success': success}
+    return success
 
 
-encryption_results = run_encryption_test()
-decryption_results = run_decryption_test(
-    encryption_results['username'], encryption_results['password'], encryption_results['uid'])
+def encrypt_password():
+    print('Encrypting password')
 
-if decryption_results['success'] == True:
-    print("\nTEST SUCCESSFUL")
-else:
-    print("\nTEST FAILED")
+    run(['python3', '-m', 'crypto-service',
+        '-e', '-p', f'{PASSWORD}', '-o', f'{OUTPUT_DIR_PATH}'], check=True)
+    sleep(SLEEP_LENGTH)
+
+    path_to_results: str = join(OUTPUT_DIR_PATH, RESULTS_FILENAME)
+    with open(path_to_results, encoding='utf-8') as results_file:
+        results = load(results_file)
+
+    success: bool = True
+    if results['text_state'] != 'encrypted' or results['password'] == PASSWORD:
+        print('Error: Text is not encrypted')
+        success = False
+
+    return {
+        'success': success,
+        'password': results['password'],
+        'puid': results['puid']
+    }
+
+
+def decrypt_password(encrypted_password: str, puid: str) -> bool:
+    print('Decrypting password')
+
+    run(['python3', '-m', 'crypto-service', '-d', '-p',
+        f'{encrypted_password}', '-puid', f'{puid}', '-o', f'{OUTPUT_DIR_PATH}'], check=True)
+    sleep(SLEEP_LENGTH)
+
+    path_to_results: str = join(OUTPUT_DIR_PATH, RESULTS_FILENAME)
+    with open(path_to_results, encoding='utf-8') as results_file:
+        results = load(results_file)
+
+    success: bool = True
+    if results['text_state'] != 'decrypted':
+        success = False
+        print('Error: Text state is not decrypted')
+    if results['password'] != PASSWORD:
+        success = False
+        print('Error: Decrypted password does not match original')
+    if results['puid'] != puid:
+        success = False
+        print('Error: Returned PUID does not match original')
+
+    return success
+
+
+def encrypt_credentials() -> dict:
+    print('Encrypting username/password pair')
+
+    run(['python3', '-m', 'crypto-service', '-e', '-u',
+        f'{USERNAME}', '-p', f'{PASSWORD}', '-o', f'{OUTPUT_DIR_PATH}'], check=True)
+    sleep(SLEEP_LENGTH)
+
+    path_to_results: str = join(OUTPUT_DIR_PATH, RESULTS_FILENAME)
+    with open(path_to_results, encoding='utf-8') as results_file:
+        results = load(results_file)
+
+    success: bool = True
+    if results['text_state'] != 'encrypted' or results['username'] == USERNAME or results['password'] == PASSWORD:
+        print('Error: Text is not encrypted')
+        success = False
+
+    return {
+        'success': success,
+        'username': results['username'],
+        'uuid': results['uuid'],
+        'password': results['password'],
+        'puid': results['puid']
+    }
+
+
+def decrypt_credentials(encrypted_username: str, uuid: str, encrypted_password: str, puid: str) -> bool:
+    print('Decrypting username/password pair')
+
+    run(['python3', '-m', 'crypto-service', '-d', '-u', f'{encrypted_username}', '-uuid', f'{uuid}',
+        '-p', f'{encrypted_password}', '-puid', f'{puid}', '-o', f'{OUTPUT_DIR_PATH}'], check=True)
+    sleep(SLEEP_LENGTH)
+
+    path_to_results: str = join(OUTPUT_DIR_PATH, RESULTS_FILENAME)
+    with open(path_to_results, encoding='utf-8') as results_file:
+        results = load(results_file)
+
+    success: bool = True
+    if results['text_state'] != 'decrypted':
+        success = False
+        print('Error: Text state is not decrypted')
+    if results['username'] != USERNAME:
+        success = False
+        print('Error: Decrypted username does not match original')
+    if results['uuid'] != puid:
+        success = False
+        print('Error: Returned UUID does not match original')
+    if results['password'] != PASSWORD:
+        success = False
+        print('Error: Decrypted password does not match original')
+    if results['puid'] != puid:
+        success = False
+        print('Error: Returned PUID does not match original')
+
+    return success
+
+
+def run_single_username_test() -> bool:
+    print('Running test: Encrypt/Decrypt Single Username')
+    results: dict = encrypt_username()
+    if results['success'] is False:
+        return False
+    success = decrypt_username(results['username'], results['uuid'])
+    return success
+
+
+def run_single_password_test() -> bool:
+    print('Running test: Encrypt/Decrypt Single Password')
+    results: dict = encrypt_password()
+    if results['success'] is False:
+        return False
+    success = decrypt_password(results['password'], results['puid'])
+    return success
+
+
+def run_credentials_test() -> bool:
+    print('Running test: Encrypt/Decrypt Username/Password Pair')
+    results: dict = encrypt_credentials()
+    if results['success'] is False:
+        return False
+    success = decrypt_credentials(
+        results['username'], results['uuid'], results['password'], results['puid'])
+    return success
+
+
+def run_tests():
+    success = run_single_username_test()
+    if not success:
+        print("\nFAIL\n")
+        return
+    success = run_single_password_test()
+    if not success:
+        print("\nFAIL\n")
+        return
+    success = run_credentials_test()
+    if not success:
+        print("\nFAIL\n")
+        return
+
+    print('\nSUCCESS\n')
+
+
+run_tests()
+remove(join(OUTPUT_DIR_PATH, RESULTS_FILENAME))

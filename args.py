@@ -17,8 +17,11 @@ def get_args():
     parser.add_argument('-p', '--password', type=str,
                         help='Specify a password to encrypt or decrypt')
 
-    parser.add_argument('-uid', '--uniqueid', type=str,
-                        help='To decrypt, specify the unique ID returned after encrypting')
+    parser.add_argument('-uuid', '--usernameuid', type=str,
+                        help='To decrypt a username, specify the UID provided when the username was encrypted')
+
+    parser.add_argument('-puid', '--passworduid', type=str,
+                        help='To decrypt a password, specify the UID provided when the password was encrypted')
 
     parser.add_argument('-o', '--output', type=str,
                         help='Specify path to output directory')
